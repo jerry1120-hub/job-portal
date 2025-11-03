@@ -13,13 +13,10 @@ export const AppContextProvider = (props) => {
 
   const [searchFilter, setSearchFilter] = useState({ title: "", location: "" });
   const [isSearched, setIsSearched] = useState(false);
-
   const [jobs, setJobs] = useState([]);
   const [showRecruiterLogin, setShowRecruiterLogin] = useState(false);
-
   const [companyToken, setCompanyToken] = useState(null);
   const [companyData, setCompanyData] = useState(null);
-
   const [userData, setUserData] = useState(null);
   const [userApplications, setUserApplications] = useState([]);
 
@@ -40,46 +37,30 @@ export const AppContextProvider = (props) => {
 
   // ✅ Fetch company data
   const fetchCompanyData = async () => {
+    if (!companyToken) return;
     try {
       const { data } = await axios.get(`${backendUrl}/api/company/company`, {
         headers: { token: companyToken },
       });
-      if (data.success) {
-        setCompanyData(data.company);
-      } else {
-        toast.error(data.message);
-      }
+      if (data.success) setCompanyData(data.company);
+      else toast.error(data.message);
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // ✅ Register new user if not in database
-  const registerUserIfNeeded = async () => {
-    try {
-      const token = await getToken();
-      await axios.post(
-        `${backendUrl}/api/users/register`,
-        {
-          clerkId: user.id,
-          name: user.fullName,
-          email: user.primaryEmailAddress.emailAddress,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log("✅ User registered or already exists in DB");
-    } catch (error) {
-      console.error("❌ Error registering user:", error.response?.data || error.message);
-    }
-  };
+  // ❌ Remove registerUserIfNeeded() – handled by backend /user route now
+  // The backend automatically registers users if not found.
 
-  // ✅ Fetch user data
+  // ✅ Fetch user data (and auto-register if missing)
   const fetchUserData = async () => {
+    if (!user) return;
     try {
       const token = await getToken();
       const { data } = await axios.get(`${backendUrl}/api/users/user`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (data.success) {
         setUserData(data.user);
         console.log("✅ User data:", data.user);
@@ -87,17 +68,20 @@ export const AppContextProvider = (props) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error("❌ Fetch user data error:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
-  // ✅ Fetch user applications
+  // ✅ Fetch user job applications
   const fetchUserApplications = async () => {
+    if (!user) return;
     try {
       const token = await getToken();
       const { data } = await axios.get(`${backendUrl}/api/users/applications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (data.success) {
         setUserApplications(data.userApplications);
         console.log("✅ User applications:", data.userApplications);
@@ -105,34 +89,31 @@ export const AppContextProvider = (props) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error("❌ Fetch user applications error:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
-  // ✅ Initial load: fetch jobs + stored company token
+  // ✅ On first load, fetch jobs & company token
   useEffect(() => {
     fetchJobs();
-
     const storedCompanyToken = localStorage.getItem("companyToken");
-    if (storedCompanyToken) {
-      setCompanyToken(storedCompanyToken);
-    }
+    if (storedCompanyToken) setCompanyToken(storedCompanyToken);
   }, []);
 
-  // ✅ Fetch company data when token changes
+  // ✅ When company token changes
   useEffect(() => {
-    if (companyToken) {
-      fetchCompanyData();
-    }
+    fetchCompanyData();
   }, [companyToken]);
 
-  // ✅ Auto-register user + fetch data & applications
+  // ✅ When user logs in, fetch user data and applications
   useEffect(() => {
     if (user) {
-      registerUserIfNeeded().then(() => {
-        fetchUserData();
-        fetchUserApplications();
-      });
+      fetchUserData();
+      fetchUserApplications();
+    } else {
+      setUserData(null);
+      setUserApplications([]);
     }
   }, [user]);
 
@@ -159,6 +140,8 @@ export const AppContextProvider = (props) => {
   };
 
   return (
-    <AppContext.Provider value={value}>{props.children}</AppContext.Provider>
+    <AppContext.Provider value={value}>
+      {props.children}
+    </AppContext.Provider>
   );
 };

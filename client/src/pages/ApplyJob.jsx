@@ -14,7 +14,7 @@ import { useAuth } from "@clerk/clerk-react";
 
 const ApplyJob = () => {
   const { id } = useParams();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth(); // ✅ Ensure we get Clerk's userId
   const navigate = useNavigate();
 
   const [JobData, setJobData] = useState(null);
@@ -24,81 +24,89 @@ const ApplyJob = () => {
   const { jobs, backendUrl, userData, userApplications, fetchUserApplications } =
     useContext(AppContext);
 
+  // ✅ Fetch job details
   const fetchJob = async () => {
     try {
-      const { data } = await axios.get(backendUrl + `/api/jobs/${id}`);
+      const { data } = await axios.get(`${backendUrl}/api/jobs/${id}`);
       if (data.success) {
         setJobData(data.job);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
- const applyHandler = async () => {
-  try {
-    if (!userData) return toast.error("Login to apply for jobs");
-    if (!userData.resume) {
-      navigate("/applications");
-      return toast.error("Upload resume to apply");
+  // ✅ Apply for job
+  const applyHandler = async () => {
+    try {
+      if (!userId) {
+        toast.error("Login to apply for jobs");
+        return;
+      }
+
+      if (!userData) {
+        toast.error("User data not found. Please refresh or register first.");
+        return;
+      }
+
+      if (!userData.resume) {
+        navigate("/applications");
+        return toast.error("Upload resume to apply");
+      }
+
+      const token = await getToken(); // ✅ Clerk token
+
+      const { data } = await axios.post(
+        `${backendUrl}/api/users/apply`,
+        { jobId: JobData._id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+        setIsAlreadyApplied(true);
+        setUpdatedApplications((prev) => [
+          ...prev,
+          { jobId: { _id: JobData._id } },
+        ]);
+        fetchUserApplications(); // ✅ Update user’s applications
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error("❌ applyHandler error:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
+  };
 
-    const token = await getToken();
-
-    const { data } = await axios.post(
-      backendUrl + "/api/users/apply",
-      { jobId: JobData._id },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (data.success) {
-      toast.success(data.message);
-
-      // ✅ Immediately mark this job as applied
-      setIsAlreadyApplied(true);
-
-      // ✅ Add this job to the applied jobs list to remove from More Jobs
-      setUpdatedApplications((prev) => [
-        ...prev,
-        { jobId: { _id: JobData._id } },
-      ]);
-
-      // ✅ Optional: update context if you want userApplications to reflect immediately
-      fetchUserApplications(); 
-    } else {
-      toast.error(data.message);
-    }
-  } catch (error) {
-    toast.error(error.message);
-  }
-};
-
+  // ✅ Check if already applied
   const checkAlreadyApplied = () => {
     const hasApplied = userApplications.some(
-      (item) => item.jobId._id === JobData._id
+      (item) => item.jobId && item.jobId._id === JobData._id
     );
     setIsAlreadyApplied(hasApplied);
   };
 
   useEffect(() => {
     fetchJob();
-  }, [id, jobs]);
+  }, [id]);
 
   useEffect(() => {
     if (userApplications.length > 0 && JobData) {
       checkAlreadyApplied();
     }
-  }, [JobData, userApplications, id]);
+  }, [JobData, userApplications]);
 
-  // Combine original userApplications with newly applied jobs
+  // ✅ Merge applications for “More Jobs” filtering
   const combinedApplications = [...userApplications, ...updatedApplications];
 
-  return JobData ? (
+  if (!JobData) return <Loading />;
+
+  return (
     <>
       <Navbar />
-
       <div className="min-h-screen flex flex-col py-10 container px-4 2xl:px-20 mx-auto">
         <div className="bg-white text-black rounded-lg w-full">
           <div className="flex justify-center md:justify-between flex-wrap gap-8 px-14 py-20 mb-6 bg-sky-400 rounded-xl">
@@ -121,11 +129,11 @@ const ApplyJob = () => {
                     <img src={assets.location_icon} alt="" />
                     {JobData.location}
                   </span>
-                  <span>
+                  <span className="flex items-center gap-1">
                     <img src={assets.person_icon} alt="" />
                     {JobData.level}
                   </span>
-                  <span>
+                  <span className="flex items-center gap-1">
                     <img src={assets.money_icon} alt="" />
                     CTC: {kconvert.convertTo(JobData.salary)}
                   </span>
@@ -136,7 +144,12 @@ const ApplyJob = () => {
             <div className="flex flex-col justify-center text-end text-sm max-md:mx-auto max-md:text-center">
               <button
                 onClick={applyHandler}
-                className="bg-blue-600 p-2.5 px-10 text-white rounded"
+                disabled={isAlreadyApplied}
+                className={`p-2.5 px-10 rounded text-white ${
+                  isAlreadyApplied
+                    ? "bg-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
               >
                 {isAlreadyApplied ? "Already Applied" : "Apply Now"}
               </button>
@@ -155,7 +168,12 @@ const ApplyJob = () => {
               ></div>
               <button
                 onClick={applyHandler}
-                className="bg-blue-600 p-2.5 px-10 text-white rounded mt-10"
+                disabled={isAlreadyApplied}
+                className={`p-2.5 px-10 rounded mt-10 text-white ${
+                  isAlreadyApplied
+                    ? "bg-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
               >
                 {isAlreadyApplied ? "Already Applied" : "Apply Now"}
               </button>
@@ -187,8 +205,6 @@ const ApplyJob = () => {
       </div>
       <Footer />
     </>
-  ) : (
-    <Loading />
   );
 };
 
