@@ -23,7 +23,7 @@ export const AppContextProvider = (props) => {
   const [userData, setUserData] = useState(null);
   const [userApplications, setUserApplications] = useState([]);
 
-  // ✅ Fetch jobs
+  // ✅ Fetch all jobs
   const fetchJobs = async () => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/jobs`);
@@ -51,6 +51,25 @@ export const AppContextProvider = (props) => {
       }
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  // ✅ Register new user if not in database
+  const registerUserIfNeeded = async () => {
+    try {
+      const token = await getToken();
+      await axios.post(
+        `${backendUrl}/api/users/register`,
+        {
+          clerkId: user.id,
+          name: user.fullName,
+          email: user.primaryEmailAddress.emailAddress,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log("✅ User registered or already exists in DB");
+    } catch (error) {
+      console.error("❌ Error registering user:", error.response?.data || error.message);
     }
   };
 
@@ -90,7 +109,7 @@ export const AppContextProvider = (props) => {
     }
   };
 
-  // ✅ Fetch jobs once
+  // ✅ Initial load: fetch jobs + stored company token
   useEffect(() => {
     fetchJobs();
 
@@ -107,13 +126,15 @@ export const AppContextProvider = (props) => {
     }
   }, [companyToken]);
 
-  // ✅ Fetch user data + applications when user is available
+  // ✅ Auto-register user + fetch data & applications
   useEffect(() => {
     if (user) {
-      fetchUserData();
-      fetchUserApplications();
+      registerUserIfNeeded().then(() => {
+        fetchUserData();
+        fetchUserApplications();
+      });
     }
-  }, [user]); // 👈 fixed here
+  }, [user]);
 
   const value = {
     setSearchFilter,
