@@ -2,9 +2,9 @@ import { Webhook } from "svix";
 import User from "../models/User.js";
 
 // API Controller Function to Manage Clerk User with database
-export const clerkWebhooks = async (res, req) => {
+export const clerkWebhooks = async (req, res) => {
   try {
-    // Create a svix  instance with clerk webhook secret.
+    // Create a Svix instance with Clerk webhook secret
     const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
     // Verifying Headers
@@ -25,10 +25,10 @@ export const clerkWebhooks = async (res, req) => {
           email: data.email_addresses[0].email_address,
           name: data.first_name + " " + data.last_name,
           image: data.image_url,
-          resume: '',
-        }
-        await User.create(userData)
-        res.json({})
+          resume: "",
+        };
+        await User.create(userData);
+        res.json({ success: true, message: "User created successfully" });
         break;
       }
 
@@ -37,24 +37,25 @@ export const clerkWebhooks = async (res, req) => {
           email: data.email_addresses[0].email_address,
           name: data.first_name + " " + data.last_name,
           image: data.image_url,
-        }
-        await User.findByIdAndUpdate(data.id, userData)
-        res.json({})
+        };
+        await User.findByIdAndUpdate(data.id, userData);
+        res.json({ success: true, message: "User updated successfully" });
         break;
       }
 
       case "user.deleted": {
-        await User.findByIdAndDelete(data.id)
-        res.json({})
+        await User.findByIdAndDelete(data.id);
+        res.json({ success: true, message: "User deleted successfully" });
         break;
       }
 
-      default:
+      default: {
+        res.json({ success: true, message: "Unhandled webhook event" });
         break;
+      }
     }
   } catch (error) {
-    console.log(error.message);
-    res.json({success:false,message:'Webhooks Error'})
-    
+    console.error("Webhook error:", error.message);
+    res.json({ success: false, message: "Webhooks Error" });
   }
 };
