@@ -10,10 +10,26 @@ import { requireAuth } from "@clerk/express";
 
 const router = express.Router();
 
-// ✅ All routes protected by Clerk
-router.get("/user", requireAuth(), getUserData);
-router.post("/apply", requireAuth(), applyForJob);
+// ✅ Health check (optional)
+router.get("/", (req, res) => {
+  res.json({ message: "User routes working ✅" });
+});
+
+// ✅ Get logged-in user data
+router.get("/data", requireAuth(), getUserData);
+
+// ✅ Get all applications by logged-in user
 router.get("/applications", requireAuth(), getUserJobApplications);
-router.post("/update-resume", requireAuth(), upload.single("resume"), updateUserResume);
+
+// ✅ Apply for a job (Clerk protected)
+router.post("/apply", requireAuth(), applyForJob);
+
+// ✅ Upload or update user resume
+router.post(
+  "/update-resume",
+  requireAuth(),
+  upload.single("resume"),
+  updateUserResume
+);
 
 export default router;

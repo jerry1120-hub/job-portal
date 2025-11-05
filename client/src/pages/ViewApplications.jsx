@@ -12,6 +12,7 @@ const ViewApplications = () => {
   const [applicants, setApplicants] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [dropdownOpenId, setDropdownOpenId] = useState(null); // Track which dropdown is open
 
   const fetchCompanyJobApplicants = async () => {
     if (!companyToken) return;
@@ -34,12 +35,11 @@ const ViewApplications = () => {
     }
   };
 
-  // Function to update Job Application Status
   const changeJobApplicationStatus = async (id, status) => {
     try {
       // Update locally first
       setApplicants((prev) =>
-        prev.map((app) => (app._id === id ? { ...app, status: status } : app))
+        prev.map((app) => (app._id === id ? { ...app, status } : app))
       );
 
       const { data } = await axios.post(
@@ -49,6 +49,8 @@ const ViewApplications = () => {
       );
 
       if (!data.success) toast.error(data.message);
+
+      setDropdownOpenId(null); // Close the dropdown after action
     } catch (error) {
       toast.error(error.message);
     }
@@ -105,27 +107,38 @@ const ViewApplications = () => {
                 </td>
 
                 {/* Action */}
-                <td className="py-2 px-4 border-b relative group">
+                <td className="py-2 px-4 border-b relative">
                   {applicant.status === "Pending" ? (
-                    <>
-                      <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                        <button
-                          onClick={() => changeJobApplicationStatus(applicant._id, "Accepted")}
-                          className="block w-full text-left px-4 py-2 text-blue-500 hover:bg-gray-100"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => changeJobApplicationStatus(applicant._id, "Rejected")}
-                          className="block w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                      <button className="text-gray-500 px-2 py-1 rounded hover:bg-gray-100">
-                        ...
+                    <div className="relative inline-block text-left">
+                      <button
+                        className="text-gray-500 px-2 py-1 rounded hover:bg-gray-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDropdownOpenId(
+                            dropdownOpenId === applicant._id ? null : applicant._id
+                          );
+                        }}
+                      >
+                        &#8230;
                       </button>
-                    </>
+
+                      {dropdownOpenId === applicant._id && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded shadow z-10">
+                          <button
+                            onClick={() => changeJobApplicationStatus(applicant._id, "Accepted")}
+                            className="block w-full text-left px-4 py-2 text-blue-500 hover:bg-gray-100"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => changeJobApplicationStatus(applicant._id, "Rejected")}
+                            className="block w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div>{applicant.status}</div>
                   )}

@@ -1,6 +1,6 @@
-import React, { useContext, useState, useEffect } from 'react'
-import Navbar from '../components/Navbar'
-import { assets } from '../assets/assets'
+import React, { useContext, useState, useEffect } from 'react';
+import Navbar from '../components/Navbar';
+import { assets } from '../assets/assets';
 import moment from "moment";
 import Footer from '../components/Footer';
 import { AppContext } from '../context/AppContext';
@@ -14,28 +14,34 @@ const Applications = () => {
 
   const [isEdit, setIsEdit] = useState(false);
   const [resume, setResume] = useState(null);
-  const [loading, setLoading] = useState(true); // ✅ Proper loading state
+  const [loading, setLoading] = useState(true);
 
-  // ✅ Get context data safely
   const {
     backendUrl,
     userData,
-    userApplications = [], // default to empty array
+    userApplications = [],
     fetchUserData,
-    fetchUserApplications
+    fetchUserApplications,
   } = useContext(AppContext);
 
-  // ✅ Fetch user applications when component mounts
+  // ✅ Fetch applications on mount
   useEffect(() => {
-    let isMounted = true; // prevent React update on unmounted component
-
+    let isMounted = true;
     const loadApplications = async () => {
       try {
         if (fetchUserApplications) {
           await fetchUserApplications();
+        } else {
+          // Fallback: directly fetch if context function not available
+          const token = await getToken();
+          const { data } = await axios.get(`${backendUrl}/api/user/applications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (data.success) setUserApplications(data.applications);
         }
       } catch (error) {
         console.error("Error loading applications:", error);
+        toast.error("Failed to load applications");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -45,20 +51,20 @@ const Applications = () => {
     return () => {
       isMounted = false;
     };
-  }, [fetchUserApplications]);
+  }, [fetchUserApplications, getToken, backendUrl]);
 
-  // ✅ Handle resume update
+  // ✅ Update resume
   const updateResume = async () => {
     try {
       if (!resume) return toast.error("Please select a file first");
 
       const formData = new FormData();
-      formData.append('resume', resume);
+      formData.append("resume", resume);
 
       const token = await getToken();
 
       const { data } = await axios.post(
-        `${backendUrl}/api/users/update-resume`,
+        `${backendUrl}/api/user/update-resume`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -77,7 +83,6 @@ const Applications = () => {
     }
   };
 
-  // ✅ Show loading screen while fetching
   if (loading) {
     return (
       <>
@@ -104,7 +109,7 @@ const Applications = () => {
                 </p>
                 <input
                   id="resumeUpload"
-                  onChange={e => setResume(e.target.files[0])}
+                  onChange={(e) => setResume(e.target.files[0])}
                   accept="application/pdf"
                   type="file"
                   hidden
@@ -144,7 +149,6 @@ const Applications = () => {
 
         <h2 className="text-xl font-semibold mb-4">Jobs Applied</h2>
 
-        {/* ✅ Safe render even if userApplications is empty */}
         {!Array.isArray(userApplications) || userApplications.length === 0 ? (
           <p className="text-gray-500 text-center py-10">
             No job applications found.
@@ -182,7 +186,7 @@ const Applications = () => {
                     {job.jobId?.location || "N/A"}
                   </td>
                   <td className="py-2 px-4 border-b max-sm:hidden">
-                    {moment(job.date).format("ll")}
+                    {moment(job.createdAt).format("ll")}
                   </td>
                   <td className="py-2 px-4 border-b">
                     <span

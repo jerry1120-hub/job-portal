@@ -7,7 +7,6 @@ export const AppContext = createContext();
 
 export const AppContextProvider = (props) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
   const { user } = useUser();
   const { getToken } = useAuth();
 
@@ -25,13 +24,14 @@ export const AppContextProvider = (props) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/jobs`);
       if (data.success) {
-        setJobs(data.jobs);
+        setJobs(data.jobs || []);
         console.log("✅ Jobs fetched:", data.jobs);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Failed to load jobs");
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error("❌ Jobs fetch error:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
@@ -42,30 +42,33 @@ export const AppContextProvider = (props) => {
       const { data } = await axios.get(`${backendUrl}/api/company/company`, {
         headers: { token: companyToken },
       });
-      if (data.success) setCompanyData(data.company);
-      else toast.error(data.message);
+      if (data.success) {
+        setCompanyData(data.company);
+      } else {
+        toast.error(data.message || "Failed to load company data");
+      }
     } catch (error) {
-      toast.error(error.message);
+      console.error("❌ Company data error:", error);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
-  // ❌ Remove registerUserIfNeeded() – handled by backend /user route now
-  // The backend automatically registers users if not found.
-
-  // ✅ Fetch user data (and auto-register if missing)
+  // ✅ Fetch user data
   const fetchUserData = async () => {
     if (!user) return;
     try {
       const token = await getToken();
-      const { data } = await axios.get(`${backendUrl}/api/users/user`, {
+      if (!token) return;
+
+      const { data } = await axios.get(`${backendUrl}/api/user/data`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (data.success) {
+      if (data.success && data.user) {
         setUserData(data.user);
         console.log("✅ User data:", data.user);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "User data not found");
       }
     } catch (error) {
       console.error("❌ Fetch user data error:", error);
@@ -78,23 +81,33 @@ export const AppContextProvider = (props) => {
     if (!user) return;
     try {
       const token = await getToken();
-      const { data } = await axios.get(`${backendUrl}/api/users/applications`, {
+      if (!token) return;
+
+      const { data } = await axios.get(`${backendUrl}/api/user/applications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (data.success) {
+      console.log("📦 Full applications API response:", data);
+
+      if (data.success && Array.isArray(data.userApplications)) {
         setUserApplications(data.userApplications);
         console.log("✅ User applications:", data.userApplications);
+      } else if (data.success && Array.isArray(data.applications)) {
+        // In case backend uses "applications" instead of "userApplications"
+        setUserApplications(data.applications);
+        console.log("✅ User applications (fallback):", data.applications);
       } else {
-        toast.error(data.message);
+        setUserApplications([]);
+        console.warn("⚠️ No applications array found in response:", data);
       }
     } catch (error) {
       console.error("❌ Fetch user applications error:", error);
       toast.error(error.response?.data?.message || error.message);
+      setUserApplications([]); // ensure it's always an array
     }
   };
 
-  // ✅ On first load, fetch jobs & company token
+  // ✅ On first load
   useEffect(() => {
     fetchJobs();
     const storedCompanyToken = localStorage.getItem("companyToken");
@@ -106,7 +119,7 @@ export const AppContextProvider = (props) => {
     fetchCompanyData();
   }, [companyToken]);
 
-  // ✅ When user logs in, fetch user data and applications
+  // ✅ When user logs in/out
   useEffect(() => {
     if (user) {
       fetchUserData();
@@ -118,8 +131,9 @@ export const AppContextProvider = (props) => {
   }, [user]);
 
   const value = {
-    setSearchFilter,
+    backendUrl,
     searchFilter,
+    setSearchFilter,
     isSearched,
     setIsSearched,
     jobs,
@@ -130,7 +144,6 @@ export const AppContextProvider = (props) => {
     setCompanyToken,
     companyData,
     setCompanyData,
-    backendUrl,
     userData,
     setUserData,
     userApplications,

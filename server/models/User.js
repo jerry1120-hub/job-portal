@@ -1,12 +1,12 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  _id: { type: String, required: true }, // ✅ Clerk user ID is a string
+  clerkId: { type: String, required: true, unique: true }, // Clerk user ID
   name: { type: String, required: true },
   email: { type: String, required: true },
   image: { type: String, required: true },
-  resume: { type: String },
+  resume: { type: String, default: '' },
 });
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema);
 export default User;
